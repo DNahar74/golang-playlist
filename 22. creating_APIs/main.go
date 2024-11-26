@@ -131,6 +131,44 @@ func getUserByIdentifier(w http.ResponseWriter, r *http.Request) *User {
 	return nil
 }
 
+func appendUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// params := mux.Vars(r)
+
+	var newUser User
+	err := json.NewDecoder(r.Body).Decode(&newUser)
+	if err!= nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+  }
+
+	if !newUser.IsValid() {
+    http.Error(w, "Invalid user data", http.StatusBadRequest)
+    return
+  }
+
+	if newUser.IsEmpty() {
+    http.Error(w, "Empty user data", http.StatusBadRequest)
+		return
+	}
+
+	users = append(users, &newUser)
+}
+
+func deleteUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+  params := mux.Vars(r)
+
+  for index, user := range users {
+    if user.Email == params["id"] || user.Username == params["id"] {
+      users = append(users[:index], users[index+1:]...)
+      return
+    }
+  }
+}
+
 func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 	http.HandleFunc("/", HomepageHandler)

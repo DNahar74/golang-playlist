@@ -14,7 +14,7 @@ import (
 type User struct {
 	Username   string       `json:"username"`
 	Email      string       `json:"email"`
-	Password   string       `json:"-"`
+	Password   string       `json:"password"`
 	Age        int          `json:"age"`
 	Furnitures []*Furniture `json:"furnitures"`
 }
@@ -97,7 +97,7 @@ func (user *User) IsEmpty() bool {
 
 // IsValid checks if a user object is valid
 func (user *User) IsValid() bool {
-	if user.IsEmpty() || len(user.Password) < 8 || user.Age >= 18 {
+	if user.IsEmpty() || len(user.Password) < 8 || user.Age < 18 {
 		return false
 	}
 	return true
@@ -113,69 +113,136 @@ func HomepageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getUsers(w http.ResponseWriter, _ *http.Request) {
+func getUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
 }
 
-func getUserByIdentifier(w http.ResponseWriter, r *http.Request) *User {
+// func getUserByIdentifier(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+
+// 	params := mux.Vars(r)
+
+// 	json.NewEncoder(w).Encode(params)
+
+// 	for _, user := range users {
+// 		if user.Email == params["id"] || user.Username == params["id"] {
+// 			json.NewEncoder(w).Encode(user)
+// 		}
+// 	}
+// }
+
+func getUserByIdentifier(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
+	identifier := params["id"]
 
 	for _, user := range users {
-		if user.Email == params["id"] || user.Username == params["id"] {
-			return user
+		if user.Email == identifier || user.Username == identifier {
+			json.NewEncoder(w).Encode(user)
+			return
 		}
 	}
-	return nil
+
+	http.Error(w, "User not found", http.StatusNotFound)
 }
+
+// func appendUser(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+
+// 	// params := mux.Vars(r)
+
+// 	var newUser User
+// 	err := json.NewDecoder(r.Body).Decode(&newUser)
+// 	if err!= nil {
+//     http.Error(w, err.Error(), http.StatusBadRequest)
+//     return
+//   }
+
+// 	if !newUser.IsValid() {
+//     http.Error(w, "Invalid user data", http.StatusBadRequest)
+//     return
+//   }
+
+// 	if newUser.IsEmpty() {
+//     http.Error(w, "Empty user data", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	users = append(users, &newUser)
+// }
 
 func appendUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// params := mux.Vars(r)
-
 	var newUser User
 	err := json.NewDecoder(r.Body).Decode(&newUser)
-	if err!= nil {
-    http.Error(w, err.Error(), http.StatusBadRequest)
-    return
-  }
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	// The issue is that if we put password = `json: '-'`, it ignores the field during encoding as well as decoding
 	if !newUser.IsValid() {
-    http.Error(w, "Invalid user data", http.StatusBadRequest)
-    return
-  }
-
-	if newUser.IsEmpty() {
-    http.Error(w, "Empty user data", http.StatusBadRequest)
+		http.Error(w, "Invalid user data", http.StatusBadRequest)
 		return
 	}
 
 	users = append(users, &newUser)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(newUser)
 }
+
+// func deleteUser(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+
+// 	params := mux.Vars(r)
+
+// 	for index, user := range users {
+// 		if user.Email == params["id"] || user.Username == params["id"] {
+// 			users = append(users[:index], users[index+1:]...)
+// 			return
+// 		}
+// 	}
+// }
 
 func deleteUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-  params := mux.Vars(r)
+	params := mux.Vars(r)
+	identifier := params["id"]
 
-  for index, user := range users {
-    if user.Email == params["id"] || user.Username == params["id"] {
-      users = append(users[:index], users[index+1:]...)
-      return
-    }
-  }
+	for index, user := range users {
+		if user.Email == identifier || user.Username == identifier {
+			users = append(users[:index], users[index+1:]...)
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
+			return
+		}
+	}
+
+	http.Error(w, "User not found", http.StatusNotFound)
 }
 
 func main() {
-	log.Fatal(http.ListenAndServe(":8080", nil))
-	http.HandleFunc("/", HomepageHandler)
+	// log.Fatal(http.ListenAndServe(":8080", nil))
+	// http.HandleFunc("/", HomepageHandler)
 
-	// mux:=http.NewServeMux()
+	// mux := http.NewServeMux() // this does not support dynamic routes
 	// mux.HandleFunc("/", HomepageHandler)
 	// mux.HandleFunc("/users", getUsers)
+	// mux.HandleFunc("/users/{id}", getUserByIdentifier)
 
 	// log.Fatal(http.ListenAndServe(":8080", mux))
+
+	router := mux.NewRouter()
+
+	router.HandleFunc("/", HomepageHandler)
+	router.HandleFunc("/users", getUsers).Methods("GET")
+	router.HandleFunc("/users/{id}", getUserByIdentifier).Methods("GET")
+	router.HandleFunc("/users", appendUser).Methods("POST")
+	router.HandleFunc("/users/{id}", deleteUser).Methods("DELETE")
+
+	log.Fatal(http.ListenAndServe(":8080", router))
 }

@@ -1,4 +1,5 @@
 //? bson.D vs bson.M :: https://stackoverflow.com/questions/64281675/bson-d-vs-bson-m-for-find-queries
+//? primitive.M vs bson.M
 
 package helpers
 
@@ -69,3 +70,25 @@ func deleteAllMovies() {
   fmt.Printf("delete all result: %+v\n", result)
 }
 
+// getAllMovies is a function to get all documents in a MongoDB collection and return them as a slice of bson.D
+func getAllMovies() []bson.D {
+	cursor, err := collection.Find(context.Background(), bson.D{{}})
+	if err!= nil {
+    log.Fatal(err)
+  }
+	defer cursor.Close(context.Background())
+
+	var movies []bson.D
+
+	for cursor.Next(context.Background()) {
+		var movie bson.D
+		err := cursor.Decode(&movie)
+		if err!= nil {
+      log.Fatal(err)
+    }
+
+		movies = append(movies, movie)
+	}
+
+	return movies
+}

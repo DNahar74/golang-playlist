@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	channel := make(chan int)
+	// channel := make(chan int)
 
 	//? This will cause deadlock
 	// channel <- 5
@@ -83,34 +83,61 @@ func main() {
 	//* (1) Channels Are Blocking: The main function immediately reads from channel2 (fmt.Println(<-channel2)) as soon as "Goroutine-3" sends 2.
 	//* (2) The main function's execution is not synchronized with the WaitGroup or the other goroutines—it processes channel2 independently.
 	
+	//? On adding close(channel) it allows the channel to close, and continue with the goroutine execution
+	//? Also, the channel2 in main func is always ready to recieve
+	// wg := &sync.WaitGroup{}
+	// channel2 := make(chan int)
+
+	// wg.Add(3)
+
+	// go func(wg *sync.WaitGroup, channel chan int) {
+	// 	fmt.Println("Start, Goroutine-1")
+	// 	channel <- 5
+	// 	close(channel)
+	// 	fmt.Println("Sent channel, Goroutine-1")
+	// 	wg.Done()
+	// }(wg, channel)
+
+	// go func(wg *sync.WaitGroup, channel chan int) {
+	// 	fmt.Println("Start, Goroutine-2")
+	// 	value := <-channel
+	// 	fmt.Println("Recieved channel, Goroutine-2")
+	// 	fmt.Println(value) 
+	// 	wg.Done()
+	// }(wg, channel)
+
+	// go func(wg *sync.WaitGroup, channel2 chan int) {
+	// 	fmt.Println("Start, Goroutine-3")
+	// 	channel2 <- 2
+	// 	close(channel2)
+	// 	fmt.Println("Sent channel, Goroutine-3")
+	// 	wg.Done()
+	// }(wg, channel2)
+
+	// fmt.Println(<-channel2)
+
+	// wg.Wait()
+
+	//? What if we want to make a buffered channel
+	channel := make(chan int, 10)
 	wg := &sync.WaitGroup{}
-	channel2 := make(chan int)
-
-	wg.Add(3)
+	wg.Add(2)
 
 	go func(wg *sync.WaitGroup, channel chan int) {
-		fmt.Println("Start, Goroutine-1")
-		channel <- 5
-		fmt.Println("Sent channel, Goroutine-1")
+		for i := 0; i < 10; i++ {
+			channel <- i
+		}
+		// If you don't close then there is a deadlock
+		close(channel)
 		wg.Done()
 	}(wg, channel)
 
 	go func(wg *sync.WaitGroup, channel chan int) {
-		fmt.Println("Start, Goroutine-2")
-		value := <-channel
-		fmt.Println("Recieved channel, Goroutine-2")
-		fmt.Println(value) 
+		for val, ok := <-channel; ok == true; val, ok = <-channel {
+			fmt.Println(val)
+		}
 		wg.Done()
 	}(wg, channel)
-
-	go func(wg *sync.WaitGroup, channel2 chan int) {
-		fmt.Println("Start, Goroutine-3")
-		channel2 <- 2
-		fmt.Println("Sent channel, Goroutine-3")
-		wg.Done()
-	}(wg, channel2)
-
-	fmt.Println(<-channel2)
 
 	wg.Wait()
 }
